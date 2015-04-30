@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<!--
+ // --------------------------------------------------------------------
+ // For more information about Application Cache, read the following
+ // article below:
+ // http://www.html5rocks.com/en/tutorials/appcache/beginner/
+ // --------------------------------------------------------------------
+-->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<!-- Sets whether a web application runs in full-screen mode. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+<!-- Sets the style of the status bar for a web application. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- // Chrome for Android -->
+<meta name="mobile-web-app-capable" content="yes">
+<title>Lubbock CitiBus Routes</title>
+
+<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css" />
+<link rel="stylesheet" href="http://js.arcgis.com/3.13/esri/css/esri.css" />
+
+<style>
+  html, body, #ui-map-page, #ui-map-content, #ui-map {
+    width: 100%;
+    height: 100%;
+    margin: 0px;
+    padding: 0px;
+  }
+
+  #triangleDialog img {
+    max-width: 300px;
+    max-height: 300px;
+  }
+
+  #legendDialog {
+    max-width: 290px;
+  }
+
+  #ui-ternary-button {
+    top: 85px;
+    left: 20px;
+    position: absolute;
+  }
+
+  #ui-legend-button {
+    top: 140px;
+    left: 20px;
+    position: absolute;
+  }
+</style>
+
+<script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+<script src="http://js.arcgis.com/3.13compact/"></script>
+
+<script>
+  $.mobile.pagecontainer({defaults: true});
+  $.mobile.pagecontainer({
+    create: function (event, ui){
+      console.log("create:", event.type);
+      initializeEsriJS();
+    }
+  });
+
+  function initializeEsriJS(){
+    require([
+        "dojo/on",
+        "dojo/parser",
+        "esri/Color",
+        "esri/dijit/Legend",
+		  "esri/dijit/InfoWindowLite",
+        "esri/InfoTemplate",
+        "esri/geometry/Point",
+        "esri/geometry/webMercatorUtils",
+        "esri/graphic",
+        "esri/layers/ArcGISDynamicMapServiceLayer",
+        "esri/layers/FeatureLayer",
+		 "dojo/dom-construct",
+        "esri/layers/ImageParameters",
+        "esri/map",
+        "esri/symbols/PictureMarkerSymbol",
+        "esri/symbols/SimpleFillSymbol",
+		"esri/symbols/SimpleMarkerSymbol",
+        "esri/tasks/query"
+      ],
+      function (on, parser, Color, Legend, InfoWindowLite,
+          InfoTemplate, Point, webMercatorUtils, Graphic, ArcGISDynamicMapServiceLayer,
+        FeatureLayer, domConstruct, ImageParameters,
+        Map, PictureMarkerSymbol, SimpleFillSymbol, SimpleMarkerSymbol, Query){
+        parser.parse();
+
+        var map, soilSurvey;
+
+        // create the map
+        map = new Map("ui-map", {
+          center: [-101.85318, 33.552053],
+          zoom: 13,
+          basemap: "gray"
+        });
+        on(map, "load", mapLoadHandler);
+
+             
+        var soilDynamicLayer = new ArcGISDynamicMapServiceLayer("http://cgstftp.ttu.edu/arcgis/rest/services/Almutlaq/BusRoutes/MapServer",
+          {"opacity": 1});
+        map.addLayer(soilDynamicLayer);
+		        var soilDynamicLayer1 = new ArcGISDynamicMapServiceLayer("http://cgstftp.ttu.edu/arcgis/rest/services/Almutlaq/AllBusStop/MapServer",
+          {"opacity": 1});
+        map.addLayer(soilDynamicLayer1);
+      var infoWindow = new InfoWindowLite(null, domConstruct.create("div", null, null, map.root));
+        infoWindow.startup();
+        map.setInfoWindow(infoWindow);
+
+        var template = new InfoTemplate();
+        template.setTitle("<b>Bus Number</b> - ${BusNumber}</b>");
+        template.setContent("Bus Number ${BusNumber} is on Route ${RouteName} <br /> Schedule can be found <a href=${Schedule} target=_blank>Here</a> <br /> <b>Time: </b> ${Time}");
+
+        soilSurvey = new FeatureLayer("http://cgstftp.ttu.edu/arcgis/rest/services/Almutlaq/AllBusStop/MapServer/0",
+          {
+            mode: FeatureLayer.MODE_ONDEMAND,
+            outFields: ["*"],
+			infoTemplate: template
+          });
+        soilSurvey.setSelectionSymbol(new SimpleMarkerSymbol().setColor(new Color([254, 216, 93, 0.6])));
+        map.addLayer(soilSurvey);
+ map.infoWindow.resize(300, 180);
+        
+
+        var legend = new Legend({
+          map: map,
+          respectCurrentMapScale: false,
+          
+        }, "legendDiv");
+        legend.startup();
+
+        function mapLoadHandler(event){
+          if (navigator.geolocation) {
+            // if you want to track as the user moves setup navigator.geolocation.watchPostion
+            navigator.geolocation.getCurrentPosition(zoomToLocation, locationError);
+          }
+        }
+
+        function locationError(error){
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              console.log("Location not provided");
+              break;
+            case error.POSITION_UNAVAILABLE:
+              console.log("Current location not available");
+              break;
+            case error.TIMEOUT:
+              console.log("Timeout");
+              break;
+            default:
+              console.log("unknown error");
+              break;
+          }
+        }
+
+        function zoomToLocation(position){
+          var mapPoint = webMercatorUtils.geographicToWebMercator(new Point(position.coords.longitude,
+            position.coords.latitude));
+          map.centerAndZoom(mapPoint, 13);
+          var symbol = new PictureMarkerSymbol("images/bluedot.png", 40, 40);
+          map.graphics.add(new Graphic(mapPoint, symbol));
+        }
+      });
+  }
+</script>
+</head>
+
+<body>
+<div data-role="page" id="ui-map-page">
+  <!-- content -->
+  <div data-role="content" id="ui-map-content">
+    <div id="ui-map"></div>
+     <a href="#triangleDialog" data-rel="popup" data-theme="a" data-position-to="window" data-role="button"
+       data-inline="true" data-transition="pop" data-icon="info" data-iconpos="notext"
+       id="ui-ternary-button" class="ui-btn">Citibus Contact</a>
+
+    <a href="#legendDialog" data-rel="popup" data-theme="a" data-position-to="window" data-role="button"
+      data-inline="true" data-transition="pop" data-icon="grid" data-iconpos="notext"
+      id="ui-legend-button" class="ui-btn">Legend</a>
+  </div>
+
+  <div data-role="popup" id="triangleDialog" data-theme="a">
+    <a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext"
+      class="ui-btn-right">Close</a>
+    <div data-role="header">
+      <h1>Citi Bus Contact</h1>
+    </div>
+    <div data-role="content">
+      <img src="http://www.citibus.com/img/citibus-logo.png" style=" background-color: Red; padding: 10px;"; />
+    </div>
+  </div>
+
+  <div data-role="popup" id="legendDialog" data-overlay-theme="a" data-theme="a" data-dismissible="false"
+    class="ui-corner-all">
+    <a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext"
+      class="ui-btn-right">Close</a>
+
+    <div data-role="header" data-theme="a" class="ui-corner-top">
+      <h1>Legend</h1>
+    </div>
+    <div data-role="content" data-theme="d" class="ui-corner-bottom ui-content">
+      <div id="legendDiv"></div>
+    </div>
+  </div>
+
+  <div data-role="popup" id="attributeDialog" data-overlay-theme="a" data-theme="a" data-dismissible="false"
+    class="ui-corner-all popupStyle" style="width:250px; height: 250px">
+    <a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext"
+      class="ui-btn-right">Close</a>
+
+    <div data-role="header" data-theme="a" class="ui-corner-top">
+      <h1>Details</h1>
+    </div>
+    <div data-role="content" data-theme="d" class="ui-corner-bottom ui-content">
+      <div id="contentDiv"></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
+ 
+          
