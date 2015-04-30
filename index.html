@@ -16,7 +16,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <!-- // Chrome for Android -->
 <meta name="mobile-web-app-capable" content="yes">
-<title>Lubbock CitiBus Routes</title>
+<title>Soil Survey</title>
 
 <link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css" />
 <link rel="stylesheet" href="http://js.arcgis.com/3.13/esri/css/esri.css" />
@@ -70,25 +70,20 @@
         "dojo/parser",
         "esri/Color",
         "esri/dijit/Legend",
-		  "esri/dijit/InfoWindowLite",
-        "esri/InfoTemplate",
         "esri/geometry/Point",
         "esri/geometry/webMercatorUtils",
         "esri/graphic",
         "esri/layers/ArcGISDynamicMapServiceLayer",
         "esri/layers/FeatureLayer",
-		 "dojo/dom-construct",
         "esri/layers/ImageParameters",
         "esri/map",
         "esri/symbols/PictureMarkerSymbol",
         "esri/symbols/SimpleFillSymbol",
-		"esri/symbols/SimpleMarkerSymbol",
         "esri/tasks/query"
       ],
-      function (on, parser, Color, Legend, InfoWindowLite,
-          InfoTemplate, Point, webMercatorUtils, Graphic, ArcGISDynamicMapServiceLayer,
-        FeatureLayer, domConstruct, ImageParameters,
-        Map, PictureMarkerSymbol, SimpleFillSymbol, SimpleMarkerSymbol, Query){
+      function (on, parser, Color, Legend, Point, webMercatorUtils, Graphic, ArcGISDynamicMapServiceLayer,
+        FeatureLayer, ImageParameters,
+        Map, PictureMarkerSymbol, SimpleFillSymbol, Query){
         parser.parse();
 
         var map, soilSurvey;
@@ -96,41 +91,48 @@
         // create the map
         map = new Map("ui-map", {
           center: [-101.85318, 33.552053],
-          zoom: 13,
+          zoom: 7,
           basemap: "gray"
         });
         on(map, "load", mapLoadHandler);
 
-             
-        var soilDynamicLayer = new ArcGISDynamicMapServiceLayer("http://cgstftp.ttu.edu/arcgis/rest/services/Almutlaq/BusRoutes/MapServer",
-          {"opacity": 1});
+        var imageParameters = new ImageParameters();
+        imageParameters.layerIds = [0];
+        imageParameters.layerOption = ImageParameters.LAYER_OPTION_SHOW;
+        var soilDynamicLayer = new ArcGISDynamicMapServiceLayer("http://server.arcgisonline.com/ArcGIS/rest/services/Specialty/Soil_Survey_Map/MapServer",
+          {"opacity": 0.5, imageParameters: imageParameters});
         map.addLayer(soilDynamicLayer);
-		        var soilDynamicLayer1 = new ArcGISDynamicMapServiceLayer("http://cgstftp.ttu.edu/arcgis/rest/services/Almutlaq/AllBusStop/MapServer",
-          {"opacity": 1});
-        map.addLayer(soilDynamicLayer1);
-      var infoWindow = new InfoWindowLite(null, domConstruct.create("div", null, null, map.root));
-        infoWindow.startup();
-        map.setInfoWindow(infoWindow);
 
-        var template = new InfoTemplate();
-        template.setTitle("<b>Bus Number</b> - ${BusNumber}</b>");
-        template.setContent("Bus Number ${BusNumber} is on Route ${RouteName} <br /> Schedule can be found <a href=${Schedule} target=_blank>Here</a> <br /> <b>Time: </b> ${Time}");
-
-        soilSurvey = new FeatureLayer("http://cgstftp.ttu.edu/arcgis/rest/services/Almutlaq/AllBusStop/MapServer/0",
+        soilSurvey = new FeatureLayer("http://server.arcgisonline.com/ArcGIS/rest/services/Specialty/Soil_Survey_Map/MapServer/0",
           {
-            mode: FeatureLayer.MODE_ONDEMAND,
-            outFields: ["*"],
-			infoTemplate: template
+            mode: FeatureLayer.MODE_SELECTION,
+            outFields: ["*"]
           });
-        soilSurvey.setSelectionSymbol(new SimpleMarkerSymbol().setColor(new Color([254, 216, 93, 0.6])));
+        soilSurvey.setSelectionSymbol(new SimpleFillSymbol().setColor(new Color([254, 216, 93, 0.6])));
         map.addLayer(soilSurvey);
- map.infoWindow.resize(300, 180);
-        
+
+        map.on("click", function (evt){
+          var query = new Query();
+          query.geometry = evt.mapPoint;
+
+          soilSurvey.selectFeatures(query, FeatureLayer.SELECTION_NEW, function (features){
+            var graphic = features[0];
+            var content = graphic.attributes.muname + "<br><b>Order</b>: " + graphic.attributes.DomOrd
+              + "<br><b>SubOrder</b>: " + graphic.attributes.DomSubOrd + "<br><b>Description</b>:"
+              + graphic.attributes.farmlndcl + "<br><b>Drainage</b>:" + graphic.attributes.DrainageCl;
+            $('#contentDiv').html(content);
+            $("#attributeDialog").popup("open");
+          });
+        });
 
         var legend = new Legend({
           map: map,
           respectCurrentMapScale: false,
-          
+          layerInfos: [
+            {
+              layer: soilSurvey, title: "Dominant Soil Order"
+            }
+          ]
         }, "legendDiv");
         legend.startup();
 
